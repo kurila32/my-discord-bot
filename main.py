@@ -1,6 +1,17 @@
 import discord
 import google.generativeai as genai
 import os
+from threading import Thread
+from flask import Flask
+
+# --- Render用のダミーWebサーバー設定 ---
+app = Flask('')
+@app.route('/')
+def home():
+    return "メイは元気に動いてるにゃん！"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
 
 # Renderの「Environment」設定から読み込むように変更しました
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
@@ -59,4 +70,5 @@ if __name__ == "__main__":
     if DISCORD_TOKEN:
         client.run(DISCORD_TOKEN)
     else:
+
         print("DISCORD_TOKENが設定されていませんにゃ！")
