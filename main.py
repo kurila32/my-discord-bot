@@ -40,7 +40,7 @@ model = genai.GenerativeModel(
 )
 
 # 画像生成用モデルの初期化 (Imagen 4.0 Fast)
-image_model = genai.ImageGenerationModel("imagen-4.0-fast-generate-001")
+image_model = genai.ImageGenerationModel("imagen-3.0-fast-generate-001")
 
 # ユーザーごとの会話履歴
 user_chat_sessions = {}
@@ -113,3 +113,4 @@ if __name__ == "__main__":
     t = Thread(target=lambda: app.run(host='0.0.0.0', port=port))
     t.start()
     client.run(DISCORD_TOKEN)
+
