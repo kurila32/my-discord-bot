@@ -1,7 +1,7 @@
 import discord
 import google.generativeai as genai
 import os
-import io  # 追加：画像処理用
+import io
 from threading import Thread
 from flask import Flask
 
@@ -12,16 +12,17 @@ def home():
     return "メイは元気に動いてるにゃん！"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 
-# Renderの「Environment」設定から読み込むように変更しました
+# 環境変数の読み込み
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # Geminiの設定
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 追加：無視したいメッセージの開始文字
+# 無視したいメッセージの開始文字
 IGNORE_PREFIXES = ("!", "/", "(", "（", ".", "help")
 
 character_profile = """
@@ -32,15 +33,16 @@ character_profile = """
 - ユーザーとの関係: あなたを「ウバ様」や「ご主人さま」と呼んで慕っています。
 """
 
+# 会話用モデル (画像認識対応のflash-latestを使用)
 model = genai.GenerativeModel(
     model_name='gemini-flash-latest',
     system_instruction=character_profile
 )
 
-# 追加：画像生成用モデルの初期化
+# 画像生成用モデルの初期化 (Imagen 4.0 Fast)
 image_model = genai.ImageGenerationModel("imagen-4.0-fast-generate-001")
 
-# ユーザーごとの会話履歴を保存する辞書
+# ユーザーごとの会話履歴
 user_chat_sessions = {}
 
 # Discord Botの設定
@@ -57,42 +59,57 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    # 追加：無視機能（指定した文字で始まる場合は反応しない）
+    # 無視機能
     if message.content.startswith(IGNORE_PREFIXES):
         return
 
     user_id = message.author.id
-
-    # 会話の履歴を保持する仕組みを追加しました
     if user_id not in user_chat_sessions:
         user_chat_sessions[user_id] = model.start_chat(history=[])
 
     async with message.channel.typing():
         try:
-            # 追加：画像生成の判定
+            # --- 画像認識・会話処理の準備 ---
+            content_to_send = []
+            
+            # メッセージに画像が添付されているか確認
+            if message.attachments:
+                for attachment in message.attachments:
+                    if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
+                        img_data = await attachment.read()
+                        content_to_send.append({
+                            "mime_type": attachment.content_type,
+                            "data": img_data
+                        })
+            
+            # テキスト内容を追加
+            if message.content:
+                content_to_send.append(message.content)
+
+            # 何も送るものがない場合は終了
+            if not content_to_send:
+                return
+
+            # --- 判定：画像生成か、通常の会話か ---
             if "描いて" in message.content or "画像生成" in message.content:
+                # 画像生成を実行
                 response = image_model.generate_images(prompt=message.content, number_of_images=1)
                 img_bytes = io.BytesIO(response.images[0]._pil_image_bytes)
                 img_bytes.seek(0)
                 await message.reply(file=discord.File(fp=img_bytes, filename="may_art.png"))
             else:
-                # 通常の会話
+                # 通常の会話（画像が含まれていればそれも一緒に送信）
                 chat_session = user_chat_sessions[user_id]
-                response = chat_session.send_message(message.content)
+                response = chat_session.send_message(content_to_send)
                 await message.reply(response.text)
+
         except Exception as e:
             print(f"Error: {e}")
             await message.reply("困ったことが起きたにゃん＞＜")
 
 # 実行
 if __name__ == "__main__":
-    # Renderが指定するポート番号を取得（なければ8080）
     port = int(os.environ.get("PORT", 8080))
-    
-    # Flaskを別スレッドで起動
     t = Thread(target=lambda: app.run(host='0.0.0.0', port=port))
     t.start()
-    
-    # Discord Botを起動
     client.run(DISCORD_TOKEN)
-
