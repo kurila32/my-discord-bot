@@ -38,7 +38,7 @@ model = genai.GenerativeModel(
 )
 
 # 追加：画像生成用モデルの初期化
-image_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+image_model = genai.ImageGenerationModel("imagen-4.0-fast-generate-001")
 
 # ユーザーごとの会話履歴を保存する辞書
 user_chat_sessions = {}
@@ -95,3 +95,4 @@ if __name__ == "__main__":
     
     # Discord Botを起動
     client.run(DISCORD_TOKEN)
+
