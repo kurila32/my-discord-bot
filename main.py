@@ -67,8 +67,12 @@ async def on_message(message):
 
 # 実行
 if __name__ == "__main__":
-    if DISCORD_TOKEN:
-        client.run(DISCORD_TOKEN)
-    else:
-
-        print("DISCORD_TOKENが設定されていませんにゃ！")
+    # Renderが指定するポート番号を取得（なければ8080）
+    port = int(os.environ.get("PORT", 8080))
+    
+    # Flaskを別スレッドで起動
+    t = Thread(target=lambda: app.run(host='0.0.0.0', port=port))
+    t.start()
+    
+    # Discord Botを起動
+    client.run(DISCORD_TOKEN)
