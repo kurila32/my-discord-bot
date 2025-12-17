@@ -39,9 +39,6 @@ model = genai.GenerativeModel(
     system_instruction=character_profile
 )
 
-# 画像生成用モデルの初期化 (Imagen 4.0 Fast)
-image_model = genai.ImageGenerationModel("imagen-3.0-fast-generate-001")
-
 # ユーザーごとの会話履歴
 user_chat_sessions = {}
 
@@ -90,18 +87,11 @@ async def on_message(message):
             if not content_to_send:
                 return
 
-            # --- 判定：画像生成か、通常の会話か ---
-            if "描いて" in message.content or "画像生成" in message.content:
-                # 画像生成を実行
-                response = image_model.generate_images(prompt=message.content, number_of_images=1)
-                img_bytes = io.BytesIO(response.images[0]._pil_image_bytes)
-                img_bytes.seek(0)
-                await message.reply(file=discord.File(fp=img_bytes, filename="may_art.png"))
-            else:
-                # 通常の会話（画像が含まれていればそれも一緒に送信）
-                chat_session = user_chat_sessions[user_id]
-                response = chat_session.send_message(content_to_send)
-                await message.reply(response.text)
+            # お絵描き機能はエラー回避のため一旦無効化
+            # 普通に会話（画像が含まれていればそれも一緒に送信）
+            chat_session = user_chat_sessions[user_id]
+            response = chat_session.send_message(content_to_send)
+            await message.reply(response.text)
 
         except Exception as e:
             print(f"Error: {e}")
@@ -113,4 +103,5 @@ if __name__ == "__main__":
     t = Thread(target=lambda: app.run(host='0.0.0.0', port=port))
     t.start()
     client.run(DISCORD_TOKEN)
+
 
