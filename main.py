@@ -1,6 +1,7 @@
 import discord
 import google.generativeai as genai
 import os
+import io  # 追加：画像処理用
 from threading import Thread
 from flask import Flask
 
@@ -20,6 +21,9 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 # Geminiの設定
 genai.configure(api_key=GEMINI_API_KEY)
 
+# 追加：無視したいメッセージの開始文字
+IGNORE_PREFIXES = ("!", "/", "(", "（", ".", "help")
+
 character_profile = """
 あなたは「メイ」という名前の、猫獣人のメイドの少女です。
 - 性格: 少し生意気だけど、相手へのリスペクトは決して忘れない。元気で明るく天真爛漫
@@ -32,6 +36,9 @@ model = genai.GenerativeModel(
     model_name='gemini-flash-latest',
     system_instruction=character_profile
 )
+
+# 追加：画像生成用モデルの初期化
+image_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
 
 # ユーザーごとの会話履歴を保存する辞書
 user_chat_sessions = {}
@@ -50,6 +57,10 @@ async def on_message(message):
     if message.author == client.user:
         return
 
+    # 追加：無視機能（指定した文字で始まる場合は反応しない）
+    if message.content.startswith(IGNORE_PREFIXES):
+        return
+
     user_id = message.author.id
 
     # 会話の履歴を保持する仕組みを追加しました
@@ -58,9 +69,17 @@ async def on_message(message):
 
     async with message.channel.typing():
         try:
-            chat_session = user_chat_sessions[user_id]
-            response = chat_session.send_message(message.content)
-            await message.reply(response.text)
+            # 追加：画像生成の判定
+            if "描いて" in message.content or "画像生成" in message.content:
+                response = image_model.generate_images(prompt=message.content, number_of_images=1)
+                img_bytes = io.BytesIO(response.images[0]._pil_image_bytes)
+                img_bytes.seek(0)
+                await message.reply(file=discord.File(fp=img_bytes, filename="may_art.png"))
+            else:
+                # 通常の会話
+                chat_session = user_chat_sessions[user_id]
+                response = chat_session.send_message(message.content)
+                await message.reply(response.text)
         except Exception as e:
             print(f"Error: {e}")
             await message.reply("困ったことが起きたにゃん＞＜")
